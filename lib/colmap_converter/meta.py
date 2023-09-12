@@ -101,8 +101,8 @@ def calc_meta(colmap, image_downscale=1, with_cuda=True, split_nth=8):
         meta["images"][k] = filename
         meta["ids_all"] += [k]
 
-    print('DEBUG')
-    meta['ids_all'] = meta['ids_all'][::100]
+    # print('DEBUG')
+    # meta['ids_all'] = meta['ids_all'][::100]
 
     colmap_camera = get_colmap_camera(colmap)
 
