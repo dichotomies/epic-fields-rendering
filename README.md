@@ -7,7 +7,7 @@ This repository contains code for model training and inference with EPIC Fields.
 ## Setup
 
 Use the following commands to setup the folder structure for:
-- checkpoints
+- model checkpoints
 - data split
 - COLMAP (EPIC Fields) reconstructions
 
