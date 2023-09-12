@@ -1,0 +1,229 @@
+
+
+eval2:
+  ckpt:
+  dir_dst:
+  is_debug: false
+  save_cache: true
+  with_val: false
+
+render:
+  view_id:
+  debug: False
+  dir_dst: outputs/supplementary/video_neurips
+  num_frames: 200
+  num_chunks:
+  chunk_id:
+  suppress_person: False
+
+
+dir_colmap_model:
+
+ckpt_dst:
+logs_dst:
+
+model_type: 'neuraldiff' # 't-nerf' 'nerf-w'
+
+# root directory of dataset
+root: 'data'
+
+# number of xyz embedding frequencies
+N_emb_xyz: 10
+
+# number of direction embedding frequencies
+N_emb_dir: 4
+
+# number of coarse samples
+N_samples: 64
+
+# number of additional fine samples
+N_importance: 64
+
+# factor to perturb depth sampling points
+perturb: 1.0
+
+# std dev of noise added to regularize sigma
+noise_std: 1.0
+
+# number of frames (max. 1000 for our dataset)
+# N_vocab: 100000
+N_vocab: 140000 # max train frame ca. 130000
+
+# embedding size for appearance encoding
+N_a: 48
+
+# embedding size for transient encoding
+N_tau: 17
+
+# minimum color variance for loss
+beta_min: 0.03
+
+# batch size
+batch_size: 1024
+
+# chunk size to split the input to avoid reduce memory footprint
+chunk: ${mul:32,1024}
+
+# number of training epochs
+num_epochs: 10
+
+# number of gpus
+num_gpus: 1
+
+# pretrained checkpoint path to load
+ckpt_path:
+
+# learning rate
+lr: ${float:'5e-4'}
+
+# weight decay
+weight_decay: 0
+
+# experiment name
+exp_name: 'exp'
+
+# print the progress bar every i-th step
+refresh_every: 1
+
+# for Jupyter
+f: ''
+
+# K for low rank expansion of transient encoding
+lowpass_K: 21
+
+# fraction of train dataset to use per epoch. For debugging.
+train_ratio: -1
+
+# width of model as units per layer
+model_width: 256
+
+# number of workers for dataloaders
+num_workers: 4
+
+# video ID of dataset
+vid:
+
+# reproducibility
+deterministic: true
+
+# for compatibility with evaluation script
+inference: false
+
+# train dataloader type
+# choices: train
+dl_type: 'train'
+
+# frames type
+frames_dir: 'frames'
+
+# scaling of train images
+scale: 1
+
+train:
+  lrsched: 'cos'
+  ignore_split: False
+
+split_root: 'data/split'
+
+# lr scheduler
+lrsched:
+  cos:
+
+  exp:
+
+is_notebook: false
+
+# compatibility for previous checkpoints where actor padding was enabled
+actor_compat: false
+
+# train/eval with radial distortion
+with_radialdist: 1
+
+# git commit during training
+git_train:
+
+# git commit during eval
+git_eval:
+
+# ckpt path used for evaluation
+ckpt_path_eval:
+
+# multi gpu
+# choices dp, gpu
+accelerator: gpu
+
+eval:
+  sampled:
+    active: false
+    perc: 0.01
+    every_nth: 3
+    with_tqdm: true
+    scale: 1
+  retrieval:
+    active: false
+    exist_ok: false
+    sample_each_nth: 1
+    vis_each_nth: 10
+    xray:
+      active: false
+      eps: 1e-5
+    extract_tsne: false
+    preload_samples: true
+  only: false
+  perframe:
+    scale: 1
+  results_dir: results
+  exp:
+  ckpt_path:
+  qr_margin: 0.2
+  # avoid OOM by transferring model output to CPU at each chunk
+  # useful for the 64-embedding model
+  chunk_device: 'cpu'
+  ann_dir: 'toann'
+
+scratch_dir: '/scratch/local/ssd/vadim/tmp/'
+
+# task for training
+task: '3d'
+
+rendering:
+  # disable components during rendering
+  # choices: b, f, a
+  disable_components: []
+  train:
+    disable_components: ${rendering.disable_components}
+  inference:
+    disable_components: ${rendering.disable_components}
+
+
+num_sanity_val_steps: 1
+val_check_interval: 1.0
+
+data:
+  root: data
+  scale: 1
+  with_depth: False
+  set:
+    tr:
+      root: ${data.root}
+      scale: ${data.scale}
+      # select range for train ids (for debugging), e.g. [300, 320]
+      ids:
+      task: ${task}
+      sampled:
+        active: false
+        n_frames: 200
+        n_iter: 2000
+    va:
+      root: ${data.root}
+      scale: ${data.scale}
+      task: 3d
+    te:
+      root: ${data.root}
+      scale: ${data.scale}
+      task: 3d
+
+  loader:
+
+debug:
+  load_emb_different_size: false
