@@ -43,4 +43,3 @@ The notebook `experiment` in `notebooks` provides examples for:
 - training a model
 - continuing training a model from a checkpoint
 - inferencing with a trained model (loaded from the provided checkpoints)
-- 
