@@ -75,7 +75,7 @@ def on_load_checkpoint(self, checkpoint: dict) -> None:
         checkpoint.pop("optimizer_states", None)
 
 
-def init_model(ckpt_path, dataset=None, hparams=None, vid=None, emb_range_fix=None, max_frame_id=None):
+def init_model(ckpt_path, dataset=None, hparams=None, vid=None, max_frame_id=None):
 
     ckpt_path = get_latest_ckpt(ckpt_path)
 
@@ -153,15 +153,6 @@ class NeuralDiffSystem(pytorch_lightning.LightningModule):
         self.counter = 0
 
         self.loss = Loss(model_type=self.hparams.model_type)
-        if self.hparams.contrlearn.clf.loss_type == 'l1':
-            self.feature_loss = torch.nn.L1Loss()
-        if self.hparams.contrlearn.clf.loss_type == 'huber':
-            self.feature_loss = torch.nn.HuberLoss()
-
-        self.triplet_loss = torch.nn.TripletMarginLoss(
-            margin=hparams.contrlearn.triplet.margin,
-            p=2
-        )
 
         # pt lightning
         self.register_buffer('z_steps', torch.linspace(0, 1, hparams.N_samples))
@@ -203,8 +194,6 @@ class NeuralDiffSystem(pytorch_lightning.LightningModule):
             in_channels_dir=6 * hparams.N_emb_dir + 3,
             W=hparams.model_width,
             actor_compat=hparams.actor_compat,
-            sz_emb=hparams.contrlearn.emb.size,
-            emb_range_fix=hparams.contrlearn.clf.emb_range_fix,
         )
         self.models = {"coarse": self.nerf_coarse}
         if hparams.N_importance > 0:
@@ -218,8 +207,6 @@ class NeuralDiffSystem(pytorch_lightning.LightningModule):
                 beta_min=hparams.beta_min,
                 W=hparams.model_width,
                 actor_compat=hparams.actor_compat,
-                sz_emb=hparams.contrlearn.emb.size,
-                emb_range_fix=hparams.contrlearn.clf.emb_range_fix,
             )
             self.models["fine"] = self.nerf_fine
         self.models_to_train += [self.models]
@@ -288,14 +275,15 @@ class NeuralDiffSystem(pytorch_lightning.LightningModule):
         print(f'Dataset ID: {self.hparams.vid}')
         frames_dir = self.hparams.frames_dir
 
-        self.train_dataset = dataset.EPICDiff(
-            split=self.hparams.dl_type,
-            frames_dir=frames_dir,
-            scale=self.hparams.scale,
-            cfg=self.hparams,
-            model=self,
-            **kwargs
-        )
+        if self.train_dataset is None:
+            self.train_dataset = dataset.EPICDiff(
+                split=self.hparams.dl_type,
+                frames_dir=frames_dir,
+                scale=self.hparams.scale,
+                cfg=self.hparams,
+                model=self,
+                **kwargs
+            )
 
         scale = self.hparams.eval.perframe.scale
 

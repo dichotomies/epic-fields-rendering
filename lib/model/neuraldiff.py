@@ -17,7 +17,6 @@ class NeuralDiff(nn.Module):
         beta_min=0.03,
         actor_compat=False,
         sz_emb=16,
-        emb_range_fix=False
     ):
         super().__init__()
         self.actor_compat = actor_compat

@@ -215,32 +215,24 @@ class EPICDiff(Dataset):
         self.image_paths = meta['images']
         self.image_paths_inv = {v: k for k, v in self.image_paths.items()}
 
-        split_train_all = pd.read_json(f'{self.cfg.split_root}/train.json', orient='index')
-        split_train = split_train_all.loc[self.vid]
-        split_train_valid_mask = ~split_train.isnull()
-        split_train_valid = split_train[split_train_valid_mask].tolist()
-        frames_intersection = set(split_train_valid).intersection(self.image_paths_inv)
-        split_ids_train = [self.image_paths_inv[x] for x in split_train_valid]
-
         if self.cfg.train.ignore_split:
             print(' --- Using all image IDs for training (task 2).')
             self.img_ids_train = self.img_ids
+            self.img_ids_test = self.img_ids
+            self.img_ids_val = self.img_ids
         else:
             print(f'Training with {len(frames_intersection)} ({len(frames_intersection) / len(self.image_paths_inv) * 100:.2f}%) out of {len(self.image_paths_inv)} frames')
+            # if VID included in split
+            split_train_all = pd.read_json(f'{self.cfg.split_root}/train.json', orient='index')
+            split_train = split_train_all.loc[self.vid]
+            split_train_valid_mask = ~split_train.isnull()
+            split_train_valid = split_train[split_train_valid_mask].tolist()
+            frames_intersection = set(split_train_valid).intersection(self.image_paths_inv)
+            split_ids_train = [self.image_paths_inv[x] for x in split_train_valid]
+            self.img_ids_test = sorted(load_ids(self, split='test', root=self.cfg.split_root))
+            self.img_ids_val = sorted(load_ids(self, split='val', root=self.cfg.split_root))
             self.img_ids_train = split_ids_train
 
-        if self.cfg.eval.only == True or 'train' not in self.split:
-            # during evaluation ignore sampling of train indices
-            pass
-        else:
-            if self.cfg.data.set.tr.ids is not None:
-                if len(self.cfg.data.set.tr.ids) == 2:
-                    r1, r2 = self.cfg.data.set.tr.ids
-                    self.img_ids_train = meta["ids_all"][r1:r2]
-                else:
-                    self.img_ids_train = [meta["ids_all"][i] for i in self.cfg.data.set.tr.ids]
-        self.img_ids_test = sorted(load_ids(self, split='test', root=self.cfg.split_root))
-        self.img_ids_val = sorted(load_ids(self, split='val', root=self.cfg.split_root))
         self.poses_dict = meta["poses"]
         self.nears = meta["nears"]
         self.fars = meta["fars"]
@@ -257,9 +249,9 @@ class EPICDiff(Dataset):
         self.img_h = int(meta['image_h'] / self.scale)
         self.img_w = int(meta['image_w'] / self.scale)
 
-        if self.split == 'train_new':
-            assert self.img_w == self.meta['image_w']
-            assert self.img_h == self.meta['image_h']
+        # if self.split == 'train_new':
+        #     assert self.img_w == self.meta['image_w']
+        #     assert self.img_h == self.meta['image_h']
 
         if self.with_radialdist:
             camera = self.meta['camera']
@@ -280,7 +272,7 @@ class EPICDiff(Dataset):
 
     def init_cache(self):
 
-        if self.split in ['train', 'val_sampled']:
+        if self.split in ['train']:
             # create buffer of all rays and rgb data
             self.rgbs = []
             self.sids = []
@@ -289,16 +281,9 @@ class EPICDiff(Dataset):
             if self.split == 'tr' and self.cfg.task == 'cli':
                 self.masks_tr = []
 
-            if self.split == 'val_sampled':
-                ids = self.ids_val
-                self.masks = []
-                self.rays = []
-                self.ts = []
-            else:
-                ids = self.img_ids_train
+            ids = self.img_ids_train
 
             indices_flat = list(range(self.img_h * self.img_w))
-
 
             for idx in tqdm(ids):
 
@@ -311,25 +296,15 @@ class EPICDiff(Dataset):
                 self.rgbs += [self.rgbs_per_image(idx)[sampling_idx]]
                 self.sids += [torch.LongTensor([idx] * self.img_h * self.img_w)[sampling_idx]]
 
-                if self.split == 'val_sampled':
-                    rays = self.rays_per_image(idx)
-                    self.rays += [rays['rays']]
-                    self.ts += [rays['ts']]
-                    self.masks += [torch.from_numpy(self.maskloader[idx]).view(-1)]
-
             self.rgbs = torch.cat(self.rgbs, 0)  # ((N_images-1)*h*w, 3)
             self.sids = torch.cat(self.sids, 0)  # ((N_images-1)*h*w, 3)
             self.img_pxl_idxs = torch.cat(self.img_pxl_idxs, 0)
 
             self.n_train = len(self.rgbs)
 
-            if self.split == 'val_sampled':
-                self.masks = torch.cat(self.masks, 0)  # ((N_images-1)*h*w)
-                self.rays = torch.cat(self.rays, 0)  # ((N_images-1)*h*w)
-                self.ts = torch.cat(self.ts, 0)  # ((N_images-1)*h*w)
 
     def __len__(self):
-        if self.split in ['train', 'val_sampled']:
+        if self.split in ['train']:
             return self.n_train
         elif self.split == "val":
             # evaluate only one image, sampled from val img ids
@@ -340,10 +315,8 @@ class EPICDiff(Dataset):
 
     def get_train_sample(self, idx):
         sample = self.sample_rays(idx)
-        if self.split in ['train', 'val_sampled']:
+        if self.split in ['train']:
             rgb = self.rgbs[idx]
-        if self.split == 'val_sampled':
-            sample['masks'] = self.masks[idx]
         sample['rgbs'] = rgb
         sample['trid'] = torch.LongTensor([idx])
         sample['sid'] = self.sids[idx]

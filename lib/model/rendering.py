@@ -59,7 +59,6 @@ def render_rays(
     N_importance=0,
     chunk=1024 * 32,
     test_time=False,
-    xyz_cube=None,
     infer_retrieval=False,
     vdir=None,
     **kwargs,
@@ -147,7 +146,7 @@ def render_rays(
             static_sigmas = out[..., 3]  # (N_rays, N_samples_)
 
             if output_dynamic:
-                sz_emb = model_.hparams.contrlearn.emb.size
+                sz_emb = 16
                 transient_rgbs = out[..., 4:7]
                 transient_sigmas = out[..., 7]
                 transient_betas = out[..., 8]
@@ -191,16 +190,6 @@ def render_rays(
                     pers[:, :, 2] = 1
                     person_rgbs = torch.cat([person_rgbs, pers], dim=2)
 
-            if xyz_cube is not None:
-                results = {
-                    'static_rgbs': static_rgbs,
-                    'static_sigmas': static_sigmas,
-                    'transient_rgbs': transient_rgbs,
-                    'transient_sigmas': transient_sigmas,
-                    'static_emb': static_emb,
-                    'transient_emb': transient_emb,
-                }
-                return results
 
         # Convert these values using volume rendering
         deltas = z_vals[:, 1:] - z_vals[:, :-1]  # (N_rays, N_samples_-1)
@@ -348,11 +337,10 @@ def render_rays(
             results["_emb_fine_person"] = person_emb_map
             results["emb_fine"] = results['emb_fine'] + person_emb_map
 
-            if hp.contrlearn.emb.normalise:
-                results["emb_fine"] = torch.nn.functional.normalize(
-                    results["emb_fine"],
-                    dim=1
-                )
+            results["emb_fine"] = torch.nn.functional.normalize(
+                results["emb_fine"],
+                dim=1
+            )
 
             if infer_retrieval:
                 _r = {
@@ -462,55 +450,37 @@ def render_rays(
 
     embedding_xyz, embedding_dir = model_.embedding_xyz, model_.embedding_dir
 
-    if xyz_cube is None:
+    # separate input into ray origins, directions, near, far bounds etc.
+    N_rays = rays.shape[0]
+    rays_o, rays_d = rays[:, 0:3], rays[:, 3:6]
+    near, far = rays[:, 6:7], rays[:, 7:8]
+    rays_o_c, rays_d_c = rays[:, 8:11], rays[:, 11:14]
+    dir_embedded = embedding_dir(kwargs.get("view_dir", rays_d))
 
-        # separate input into ray origins, directions, near, far bounds etc.
-        N_rays = rays.shape[0]
-        rays_o, rays_d = rays[:, 0:3], rays[:, 3:6]
-        near, far = rays[:, 6:7], rays[:, 7:8]
-        rays_o_c, rays_d_c = rays[:, 8:11], rays[:, 11:14]
-        dir_embedded = embedding_dir(kwargs.get("view_dir", rays_d))
+    rays_o = rearrange(rays_o, "n1 c -> n1 1 c")
+    rays_d = rearrange(rays_d, "n1 c -> n1 1 c")
 
-        rays_o = rearrange(rays_o, "n1 c -> n1 1 c")
-        rays_d = rearrange(rays_d, "n1 c -> n1 1 c")
+    rays_o_c = rearrange(rays_o_c, "n1 c -> n1 1 c")
+    rays_d_c = rearrange(rays_d_c, "n1 c -> n1 1 c")
 
-        rays_o_c = rearrange(rays_o_c, "n1 c -> n1 1 c")
-        rays_d_c = rearrange(rays_d_c, "n1 c -> n1 1 c")
+    # sample depth points
+    z_steps = model_.z_steps
+    z_vals = near * (1 - z_steps) + far * z_steps
 
-        # sample depth points
-        z_steps = model_.z_steps
-        z_vals = near * (1 - z_steps) + far * z_steps
+    z_vals = z_vals.expand(N_rays, N_samples)
 
-        z_vals = z_vals.expand(N_rays, N_samples)
+    # perturb sampling depths (z_vals)
+    perturb_rand = perturb * torch.rand_like(z_vals)
+    if perturb > 0:
+        # (N_rays, N_samples-1) interval mid points
+        z_vals_mid = 0.5 * (z_vals[:, :-1] + z_vals[:, 1:])
+        # get intervals between samples
+        upper = torch.cat([z_vals_mid, z_vals[:, -1:]], -1)
+        lower = torch.cat([z_vals[:, :1], z_vals_mid], -1)
 
-        # perturb sampling depths (z_vals)
-        perturb_rand = perturb * torch.rand_like(z_vals)
-        if perturb > 0:
-            # (N_rays, N_samples-1) interval mid points
-            z_vals_mid = 0.5 * (z_vals[:, :-1] + z_vals[:, 1:])
-            # get intervals between samples
-            upper = torch.cat([z_vals_mid, z_vals[:, -1:]], -1)
-            lower = torch.cat([z_vals[:, :1], z_vals_mid], -1)
-
-            z_vals = lower + (upper - lower) * perturb_rand
+        z_vals = lower + (upper - lower) * perturb_rand
 
     results = {}
-
-    if xyz_cube is not None:
-        N_samples = round(xyz_cube.shape[0] ** (1/3))
-        N_rays = N_samples ** 2
-        xyz_cube = xyz_cube.view(N_rays, N_samples, 3)
-        ts = ts[:N_samples ** 2]
-        xyz_fine = xyz_cube
-        xyz_fine_c = xyz_cube
-        model = model_.nerf_fine
-        output_dynamic = True
-        t_embedded = model_.embedding_t(ts)
-        a_embedded = model_.embedding_a(ts)
-        dir_embedded = embedding_dir(kwargs.get("view_dir", vdir))
-        return inference(
-            results, model, xyz_fine, z_vals=None, xyz_c=xyz_fine_c, **kwargs
-        )
 
     xyz_coarse = rays_o + rays_d * rearrange(z_vals, "n1 n2 -> n1 n2 1")
     xyz_coarse_c = rays_o_c + rays_d_c * rearrange(z_vals, "n1 n2 -> n1 n2 1")
