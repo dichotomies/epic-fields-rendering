@@ -2,7 +2,7 @@
 
 ## About
 
-This repository contains code for model training and inference with EPIC Fields.
+This repository contains code for model training and inference with [EPIC Fields](https://arxiv.org/abs/2306.08731).
 
 ## Setup
 
