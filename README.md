@@ -17,8 +17,8 @@ If you don't have a google account or haven't installed gdrive for downloading f
 
 ```
 # download and extract the model checkpoints
-# https://drive.google.com/file/d/1mducVmaUyWg2W3vjyP3i-43_f7hm8qGd/view?usp=sharing
-gdrive download 1mducVmaUyWg2W3vjyP3i-43_f7hm8qGd
+# https://drive.google.com/file/d/1O_SygdKstj2J7QG89yYabnib2G6rbjhU/view?usp=sharing
+gdrive download 1O_SygdKstj2J7QG89yYabnib2G6rbjhU
 tar -xvf ckpts.tar
 
 # setup data directory
@@ -26,8 +26,8 @@ mkdir data
 cd data
 
 # split
-# https://drive.google.com/file/d/14cFk1AY1-n5i38M0QUhxsBqonuMebydY/view?usp=sharing
-gdrive download 14cFk1AY1-n5i38M0QUhxsBqonuMebydY
+# https://drive.google.com/file/d/1aUF2M3VHqYP4_zebVdMYNWaikPHRI_XY/view?usp=sharing
+gdrive download 1aUF2M3VHqYP4_zebVdMYNWaikPHRI_XY
 tar -xzvf split.tar.gz
 
 # link EpicKitchens-100
